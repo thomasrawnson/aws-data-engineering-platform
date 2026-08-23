@@ -6,7 +6,7 @@ An end-to-end data engineering platform demonstrating modern data engineering pr
 
 🚧 In development
 
-The core data pipeline, orchestration, automated data quality checks, AI analysis, and CI/CD pipeline are currently implemented. Infrastructure as code and further cloud integration are being developed.
+The core data pipeline, orchestration, automated data quality checks, AI analysis, CI/CD pipeline, GitHub Actions to AWS authentication, and Terraform-managed AWS infrastructure are currently implemented.
 
 ## Architecture
 
@@ -78,12 +78,15 @@ The core data pipeline, orchestration, automated data quality checks, AI analysi
 * Pytest
 * GitHub Actions
 * Automated test execution on push and pull request
+* Manual workflow dispatch for running the full pipeline in AWS
+* GitHub OpenID Connect authentication to AWS
 
 ### Infrastructure
 
 * Terraform
 * AWS IAM
 * AWS S3
+* S3 versioning, encryption, ownership controls, and public access blocking
 
 ## Pipeline
 
@@ -96,7 +99,7 @@ Raw source data is uploaded to Amazon S3 using date-based partitioning:
 ```text
 bronze/orders/
 └── ingestion_date=YYYY-MM-DD/
-    └── orders.csv
+    └── orders_with_errors.csv
 ```
 
 ### Silver
@@ -189,20 +192,52 @@ Tests currently cover:
 
 GitHub Actions automatically runs the test suite on pushes and pull requests.
 
+## CI/CD and AWS Pipeline Execution
+
+The project includes a manual GitHub Actions workflow that runs the full Python data pipeline against AWS.
+
+The workflow uses GitHub OpenID Connect to assume an AWS IAM role, so no long-lived AWS access keys are stored in GitHub.
+
+The manual pipeline workflow:
+
+* Checks out the repository
+* Installs Python dependencies
+* Assumes the AWS GitHub Actions IAM role using OIDC
+* Verifies AWS identity
+* Runs the pipeline with `python -m src.pipeline.run_pipeline`
+* Writes outputs to the Bronze, Silver, Quarantine, and Gold S3 layers
+
+Verified S3 outputs include:
+
+```text
+bronze/orders/ingestion_date=YYYY-MM-DD/orders_with_errors.csv
+silver/orders/orders_valid.csv
+quarantine/orders/orders_invalid.csv
+gold/sales/daily_product_sales.csv
+```
+
 ## Infrastructure as Code
 
-Terraform is being introduced to manage the AWS infrastructure used by the project.
+Terraform manages the AWS infrastructure used by the project.
 
-The existing S3 data lake will be brought under Terraform management rather than recreated.
+Implemented infrastructure includes:
 
-Planned infrastructure includes:
+* Existing S3 data lake brought under Terraform management
+* S3 public access blocking
+* S3 server-side encryption
+* S3 bucket versioning
+* S3 bucket ownership controls
+* GitHub OIDC provider
+* GitHub Actions IAM role
+* Least-privilege S3 access policy for the pipeline role
+* Bedrock invoke permissions for AI-assisted quality analysis
 
 ```text
 terraform/
+├── iam.tf
 ├── main.tf
-├── variables.tf
 ├── outputs.tf
-└── README.md
+└── variables.tf
 ```
 
 ## Project Structure
@@ -212,6 +247,7 @@ aws-data-engineering-platform/
 │
 ├── .github/
 │   └── workflows/
+│       ├── run-pipeline.yml
 │       └── tests.yml
 │
 ├── config/
@@ -248,6 +284,7 @@ aws-data-engineering-platform/
 │       ├── order_validation.py
 │       └── run_validation.py
 │
+├── terraform/
 ├── tests/
 ├── requirements.txt
 └── README.md
@@ -266,17 +303,39 @@ This project is designed to demonstrate practical data engineering skills includ
 * Pipeline orchestration
 * Automated testing
 * CI/CD
+* Secure GitHub Actions to AWS authentication using OIDC
 * AI/LLM integration
 * Infrastructure as code
 * AWS IAM and security
 * Reproducible infrastructure
 
+## Recent Progress
+
+### Manual GitHub Actions pipeline run
+
+Added a manual GitHub Actions workflow that runs the full Python data pipeline against AWS using OpenID Connect authentication.
+
+The workflow:
+
+* Assumes an AWS IAM role without storing long-lived AWS credentials in GitHub
+* Runs the pipeline from GitHub Actions
+* Writes raw source data to the Bronze S3 layer
+* Validates orders into Silver and Quarantine outputs
+* Builds a Gold daily product sales summary
+
+Verified outputs:
+
+```text
+bronze/orders/ingestion_date=YYYY-MM-DD/orders_with_errors.csv
+silver/orders/orders_valid.csv
+quarantine/orders/orders_invalid.csv
+gold/sales/daily_product_sales.csv
+```
+
 ## Future Improvements
 
 Planned improvements include:
 
-* Terraform-managed AWS infrastructure
-* Improved IAM policies and least-privilege access
 * Additional data sources
 * More comprehensive data quality checks
 * Production-style configuration management
@@ -284,6 +343,7 @@ Planned improvements include:
 * Data visualisation
 * Additional AWS services
 * Improved AI-generated data quality reporting
+* Terraform validation workflow in CI
 
 ## Project Goals
 
