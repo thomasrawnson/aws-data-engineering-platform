@@ -1,12 +1,23 @@
 # AWS Data Engineering Platform
 
-An end-to-end data engineering platform demonstrating modern data engineering practices using Python, AWS, data quality validation, orchestration, AI/LLMs, testing, CI/CD, and infrastructure as code.
+An end-to-end data engineering project built with Python, AWS, Dagster, Terraform, GitHub Actions, and Amazon Bedrock.
+
+The project demonstrates a realistic cloud data pipeline: ingesting source order data, storing raw data in a Bronze layer, validating and separating records into Silver and Quarantine outputs, building a Gold analytical dataset, and adding automated testing, orchestration, infrastructure as code, and CI/CD around the pipeline.
 
 ## Project Status
 
-🚧 In development
+This project is in active development. The main data pipeline is implemented and currently includes:
 
-The core data pipeline, orchestration, automated data quality checks, AI analysis, CI/CD pipeline, GitHub Actions to AWS authentication, and Terraform-managed AWS infrastructure are currently implemented.
+* Python-based ingestion, validation, transformation, and aggregation
+* AWS S3 data lake with Bronze, Silver, Quarantine, and Gold layers
+* Data quality validation with quarantined invalid records
+* Dagster orchestration and asset checks
+* Amazon Bedrock integration for AI-assisted data quality recommendations
+* Pytest test coverage for the core pipeline components
+* GitHub Actions CI for automated tests
+* Manual GitHub Actions workflow for running the pipeline in AWS
+* Terraform-managed AWS S3, IAM, and GitHub OIDC infrastructure
+* Terraform validation workflow in CI
 
 ## Architecture
 
@@ -49,15 +60,15 @@ The core data pipeline, orchestration, automated data quality checks, AI analysi
                              Quality Report
 ```
 
-## Technologies
+## Technology Stack
 
 ### Data Engineering
 
 * Python 3.12
 * Pandas
 * AWS S3
+* Bronze, Silver, Quarantine, and Gold data layers
 * Data validation and transformation
-* Bronze / Silver / Gold architecture
 
 ### Orchestration
 
@@ -66,31 +77,32 @@ The core data pipeline, orchestration, automated data quality checks, AI analysi
 * Dagster asset checks
 * Scheduled pipeline execution
 
-### AI
+### AI-Assisted Quality Analysis
 
 * Amazon Bedrock
 * Amazon Nova Lite
-* AI-assisted data quality analysis
-* Automated quality recommendations
+* Rule-based validation with AI-assisted recommendations
 
-### Testing & CI/CD
+### Testing and CI/CD
 
 * Pytest
 * GitHub Actions
 * Automated test execution on push and pull request
 * Manual workflow dispatch for running the full pipeline in AWS
 * GitHub OpenID Connect authentication to AWS
+* Terraform validation workflow
 
 ### Infrastructure
 
 * Terraform
 * AWS IAM
 * AWS S3
+* GitHub OIDC provider
 * S3 versioning, encryption, ownership controls, and public access blocking
 
-## Pipeline
+## Pipeline Overview
 
-The pipeline processes order data through three primary data layers.
+The pipeline processes order data through four data layers.
 
 ### Bronze
 
@@ -102,13 +114,14 @@ bronze/orders/
     └── orders_with_errors.csv
 ```
 
+The Bronze layer preserves the source file before validation or transformation.
+
 ### Silver
 
-Orders are validated and separated into:
+Orders are validated and clean records are written to the Silver layer:
 
 ```text
 silver/orders/orders_valid.csv
-quarantine/orders/orders_invalid.csv
 ```
 
 Validation currently checks for:
@@ -119,15 +132,25 @@ Validation currently checks for:
 * Invalid order dates
 * Missing unit prices
 
+### Quarantine
+
+Invalid records are written separately rather than being silently dropped:
+
+```text
+quarantine/orders/orders_invalid.csv
+```
+
+This makes data quality problems visible and traceable.
+
 ### Gold
 
-Validated orders are transformed into an analytical sales dataset:
+Validated orders are aggregated into an analytical sales dataset:
 
 ```text
 gold/sales/daily_product_sales.csv
 ```
 
-The dataset contains:
+The Gold dataset contains:
 
 * Order date
 * Product ID
@@ -137,26 +160,22 @@ The dataset contains:
 
 ## Data Quality
 
-Dagster asset checks are used to verify the Silver dataset.
+The project uses deterministic validation rules for core data quality checks. Invalid records are separated into a Quarantine layer, while clean records continue into Silver and Gold.
 
-Current checks include:
+Dagster asset checks are used to verify the Silver dataset. Current checks include:
 
 * No validation errors
 * Unique order IDs
 * Positive quantities
 * Valid unit prices
 
-Invalid source records are quarantined rather than silently discarded.
+This approach keeps the pipeline predictable while making data quality issues easy to inspect.
 
-## AI Data Quality Analysis
+## AI-Assisted Data Quality Analysis
 
-Amazon Bedrock is integrated into the data quality workflow.
+Amazon Bedrock is used to generate human-readable recommendations from the validation results.
 
-The deterministic Python validation layer identifies data-quality problems, while the AI layer provides human-readable analysis and recommendations.
-
-This separation keeps the pipeline deterministic while using AI where it adds value.
-
-Example:
+The validation layer remains rule-based and deterministic. The AI layer is used only after validation to explain issues and suggest possible follow-up actions.
 
 ```text
 Invalid records
@@ -190,20 +209,28 @@ Tests currently cover:
 * AI quality analysis
 * AI quality reporting
 
-GitHub Actions automatically runs the test suite on pushes and pull requests.
+The test suite is run automatically by GitHub Actions on pushes and pull requests.
 
 ## CI/CD and AWS Pipeline Execution
 
-The project includes a manual GitHub Actions workflow that runs the full Python data pipeline against AWS.
+The project includes two main GitHub Actions workflows.
 
-The workflow uses GitHub OpenID Connect to assume an AWS IAM role, so no long-lived AWS access keys are stored in GitHub.
+### Tests
 
-The manual pipeline workflow:
+The standard CI workflow runs the Python test suite on pushes and pull requests.
+
+### Manual AWS Pipeline Run
+
+A separate manual workflow runs the full Python data pipeline against AWS.
+
+The workflow uses GitHub OpenID Connect to assume an AWS IAM role, so long-lived AWS access keys are not stored in GitHub.
+
+The manual workflow:
 
 * Checks out the repository
 * Installs Python dependencies
 * Assumes the AWS GitHub Actions IAM role using OIDC
-* Verifies AWS identity
+* Verifies the AWS caller identity
 * Runs the pipeline with `python -m src.pipeline.run_pipeline`
 * Writes outputs to the Bronze, Silver, Quarantine, and Gold S3 layers
 
@@ -232,6 +259,12 @@ Implemented infrastructure includes:
 * Least-privilege S3 access policy for the pipeline role
 * Bedrock invoke permissions for AI-assisted quality analysis
 
+Terraform checks are also run in GitHub Actions using:
+
+* `terraform fmt -check`
+* `terraform init -backend=false`
+* `terraform validate`
+
 ```text
 terraform/
 ├── iam.tf
@@ -248,6 +281,7 @@ aws-data-engineering-platform/
 ├── .github/
 │   └── workflows/
 │       ├── run-pipeline.yml
+│       ├── terraform.yml
 │       └── tests.yml
 │
 ├── config/
@@ -290,61 +324,54 @@ aws-data-engineering-platform/
 └── README.md
 ```
 
-## Key Engineering Practices Demonstrated
+## Engineering Practices Demonstrated
 
-This project is designed to demonstrate practical data engineering skills including:
+This project is intended to demonstrate practical data engineering and software engineering skills, including:
 
 * Python application development
 * ETL/ELT pipeline design
 * Cloud object storage
 * Data lake architecture
 * Data quality engineering
-* Data validation and quarantine
+* Data validation and quarantine handling
 * Pipeline orchestration
 * Automated testing
 * CI/CD
 * Secure GitHub Actions to AWS authentication using OIDC
-* AI/LLM integration
+* AI-assisted data quality reporting
 * Infrastructure as code
-* AWS IAM and security
-* Reproducible infrastructure
+* AWS IAM and least-privilege access
+* Reproducible infrastructure management
 
 ## Recent Progress
 
-### Manual GitHub Actions pipeline run
+Recent milestones completed:
 
-Added a manual GitHub Actions workflow that runs the full Python data pipeline against AWS using OpenID Connect authentication.
-
-The workflow:
-
-* Assumes an AWS IAM role without storing long-lived AWS credentials in GitHub
-* Runs the pipeline from GitHub Actions
-* Writes raw source data to the Bronze S3 layer
-* Validates orders into Silver and Quarantine outputs
-* Builds a Gold daily product sales summary
-
-Verified outputs:
-
-```text
-bronze/orders/ingestion_date=YYYY-MM-DD/orders_with_errors.csv
-silver/orders/orders_valid.csv
-quarantine/orders/orders_invalid.csv
-gold/sales/daily_product_sales.csv
-```
+* Built the Bronze, Silver, Quarantine, and Gold pipeline layers
+* Added validation rules and quarantined invalid records
+* Added Gold daily product sales aggregation
+* Added Dagster assets and asset checks
+* Added Amazon Bedrock quality recommendations
+* Added Pytest coverage for the core pipeline components
+* Added GitHub Actions CI for tests
+* Brought the S3 data lake under Terraform management
+* Added Terraform-managed GitHub OIDC and IAM role for GitHub Actions
+* Added a manual GitHub Actions workflow to run the full pipeline in AWS
+* Added Terraform validation checks in GitHub Actions
 
 ## Future Improvements
 
 Planned improvements include:
 
 * Additional data sources
+* Incremental ingestion and change detection
 * More comprehensive data quality checks
 * Production-style configuration management
 * Monitoring and alerting
 * Data visualisation
 * Additional AWS services
 * Improved AI-generated data quality reporting
-* Terraform validation workflow in CI
 
-## Project Goals
+## Project Goal
 
 The goal of this project is to demonstrate the design and implementation of a realistic cloud-based data engineering platform while applying software engineering principles such as testing, automation, orchestration, infrastructure as code, and maintainable Python development.
